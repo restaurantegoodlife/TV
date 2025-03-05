@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV GoodLife</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #imagem {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: rotate(0deg) scale(1); /* Adiciona rotação e escala inicial */
+            transition: transform 0.5s ease; /* Adiciona transição de 0.5 segundos para rotação e escala */
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #formulario {
+            padding: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 20px;
+            font-size: 22px;
+            margin-top: 10px;
+        }
+
+        input[type="file"] {
+            padding: 20px;
+            font-size: 22px;
+            margin-bottom: 10px;
+        }
+
+        .quadro {
+            border: 2px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .custom-file-upload {
+            cursor: pointer;
+            display: inline-block;
+            padding: 6px 12px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: middle;
+            user-select: none;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            color: white; /* Cor do texto branco para melhor visibilidade */
+        }
+
+        .red-background {
+            background-color: red; /* Cor de fundo inicial vermelha */
+        }
+
+        .green-background {
+            background-color: green !important; /* Cor de fundo verde */
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+        function updateClock() {
+            var now = new Date();
+            var hours = now.getHours().toString().padStart(2, '0');
+            var minutes = now.getMinutes().toString().padStart(2, '0');
+            var seconds = now.getSeconds().toString().padStart(2, '0');
+            var timeString = '<font color=white>'  + hours + ':' + minutes + ':' + seconds + '</font>';
+            document.getElementById('clock').textContent = timeString;
+        }
+		var clockInterval;
+
+        clockInterval = setInterval(updateClock, 1000); // Inicia o relógio
+        updateClock(); // Atualiza o relógio imediatamente quando o timer inicia
+    </script>
+   <div id="formulario">
+           <p id="clock"></p>
+
+          <input type="file" id="zipFile" accept=".zip" style="display:none;" onchange="processarArquivoZip(event)">
+        <br>
+		<button id="btnSegSex" onclick="exibirImagemFullScreen(0)">SEG a SEX</button>
+		<button id="btnSabDom" onclick="exibirImagemFullScreen(1)">Final Semana</button>
+		<button id="btnFeriado" onclick="exibirImagemFullScreen(2)">Feriado</button>  
+	</div>
+
+    <div id="imagemContainer" class="hidden"></div>
+
+    <script>
+        var imagensSelecionadas = false;
+        var imagemAtual = 1; // Inicia com a imagem 1
+		var tipoDia = 0; // 0 é dia normal, 1 é FDS
+        const imagemElement = document.getElementById('imagem');
+        const imagensAte16h = ["imagemAte16h_1", "imagemAte16h_2"];
+        const imagensApos16h = ["imagemApos16h_1", "imagemApos16h_2"];
+
+        const ordemDIASemanaAlmoco = [
+            imagensAte16h[0], imagensAte16h[1], imagensApos16h[0],
+            imagensAte16h[0], imagensAte16h[1], imagensApos16h[1]
+        ];
+
+        const ordemDIASemanaJantar = [
+            imagensApos16h[1], imagensApos16h[0], imagensApos16h[0],
+            imagensApos16h[1], imagensApos16h[0], imagensAte16h[1]
+        ];
+
+        const ordemFDSemanaAlmoco = [
+            imagensAte16h[1], imagensAte16h[0], imagensApos16h[0],
+            imagensAte16h[1], imagensAte16h[0], imagensApos16h[1]
+        ];
+
+        const ordemFDSSemanaJantar = [
+            imagensApos16h[1], imagensApos16h[0], imagensAte16h[0],
+            imagensApos16h[1], imagensApos16h[0], imagensAte16h[1]
+        ];
+
+        //const temposTransicao = [6, 10, 12, 18, 22, 24 ]; // numero de transições de imagens, cada execução tem 1 minuto
+        const temposTransicao = [3, 5, 6, 9, 11, 12 ]; // numero de transições de imagens, cada execução tem 1 minuto
+
+
+		var ordemTransicao = ordemDIASemanaAlmoco;
+		var ndxContadorTempoImagemMostrar = 0;
+		var efeitoTransicao = 0;
+
+		// exibindo os botões de seleção do dia da semana
+		document.addEventListener('DOMContentLoaded', function() {
+			const diaDaSemana = new Date().getDay();
+			const btnSegSex = document.getElementById('btnSegSex');
+			const btnSabDom = document.getElementById('btnSabDom');
+			const btnFeriado = document.getElementById('btnFeriado');
+
+			if (diaDaSemana >= 1 && diaDaSemana <= 5) { // Segunda a sexta
+				btnSegSex.style.display = 'inline-block';
+				btnSabDom.style.display = 'none';
+			} else if (diaDaSemana === 6 || diaDaSemana === 0) { // Sábado e domingo
+				btnSegSex.style.display = 'none';
+				btnSabDom.style.display = 'inline-block';
+			} 
+
+			btnFeriado.style.display = 'inline-block'; // Sempre visível
+		});
+
+
+
+		function encontrarIndice(temposTransicao, count) {
+			for (let i = 0; i < temposTransicao.length; i++) {
+				if (count <= temposTransicao[i]) {
+					return i;
+				}
+			}
+			return -1;
+		}
+	 
+      function triggerFileInput(inputId) {
+           // document.getElementById(inputId).nextElementSibling.classList.add("green-background");
+           // document.getElementById(inputId).click();
+        }
+
+		function handleFileChange(inputId) {
+			
+			// Adiciona a classe verde apenas para o botão específico
+			var specificButton = document.querySelector(`label[for="${inputId}"]`);
+			specificButton.classList.add("green-background");
+		}
+		function verificarImagensSelecionadas() {
+            var imagemAte16h_1_Input = document.getElementById("imagemAte16h_1");
+            var imagemAte16h_2_Input = document.getElementById("imagemAte16h_2");
+            var imagemApos16h_1_Input = document.getElementById("imagemApos16h_1");
+            var imagemApos16h_2_Input = document.getElementById("imagemApos16h_2");
+
+            imagensSelecionadas = imagemAte16h_1_Input.files.length > 0 &&
+                imagemAte16h_2_Input.files.length > 0 &&
+                imagemApos16h_1_Input.files.length > 0 &&
+                imagemApos16h_2_Input.files.length > 0;
+        }
+		function wait(ms) {
+			return new Promise(resolve => setTimeout(resolve, ms));
+		}
+
+        async function trocarImagem() {
+            var imagemContainer = document.getElementById("imagemContainer");
+            var formulario = document.getElementById("formulario");
+
+            var imagemElement = document.getElementById("imagem");
+            if (!imagemElement) {
+                imagemElement = document.createElement("img");
+                imagemElement.id = "imagem";
+                imagemElement.style.width = "100%";
+                imagemElement.style.height = "100%";
+                imagemElement.style.objectFit = "cover";
+                imagemContainer.appendChild(imagemElement);
+            }
+
+           
+/*
+			var horaAtual = new Date().getHours();
+            if (horaAtual >= 16) {
+                imagemExibida = URL.createObjectURL(document.getElementById(`imagemApos16h_${imagemAtual}`).files[0]);
+            } else {
+                imagemExibida = URL.createObjectURL(document.getElementById(`imagemAte16h_${imagemAtual}`).files[0]);
+            }
+*/
+			var ndxImagem = encontrarIndice(temposTransicao, ndxContadorTempoImagemMostrar);
+			if( ndxImagem === -1 )
+			{
+				ndxImagem = 0;
+				ndxContadorTempoImagemMostrar = 0;
+			}
+			const imagemExibida = URL.createObjectURL(document.getElementById(ordemTransicao[ndxImagem]).files[0]);
+
+			if (imagemExibida) {
+				// Alterna entre escala e rotação
+				imagemElement.style.transform = efeitoTransicao === 0 ? "scale(0.9)" : "rotate(-5deg)";
+
+				//console.log(ordemTransicao[ndxImagem] + ' --> ' + ndxImagem + ' -> ' + ndxContadorTempoImagemMostrar);
+				await wait(500); // Aguarda 500 milissegundos antes de alterar a imagem
+
+				imagemElement.src = imagemExibida;
+
+				// Alterna entre escala e rotação
+				imagemElement.style.transform = efeitoTransicao === 0 ? "scale(1)" : "rotate(0deg)";
+
+				formulario.classList.add("hidden");
+				imagemContainer.classList.remove("hidden");
+				if( efeitoTransicao === 0 )
+					efeitoTransicao = 1;
+				else
+					efeitoTransicao = 0;
+			} else {
+				alert("Erro: Não foi possível configurar a imagem corretamente.");
+			}
+			ndxContadorTempoImagemMostrar++;
+        }
+
+        function exibirImagemFullScreen( tipoDiaPar ) {
+			tipoDia = tipoDiaPar;
+			 clearInterval(clockInterval); // Para o relógio
+            var imagemContainer = document.getElementById("imagemContainer");
+
+            var imagemElement = document.getElementById("imagem");
+            if (!imagemElement) {
+                imagemElement = document.createElement("img");
+                imagemElement.id = "imagem";
+                imagemElement.style.width = "100%";
+                imagemElement.style.height = "100%";
+                imagemElement.style.objectFit = "cover";
+                imagemContainer.appendChild(imagemElement);
+            }
+
+            verificarImagensSelecionadas();
+
+            if (imagensSelecionadas) {
+                document.body.requestFullscreen().then(function () {
+                    trocarImagem();
+                    setInterval(function () {
+						//console.log( 'Tipo Dia : ' + tipoDia );
+						var horaAtual = new Date().getHours();
+						if( tipoDia === 0 ) // dia normal
+						{
+							if (horaAtual >= 16) {
+								ordemTransicao = ordemDIASemanaJantar;
+							} else {
+								ordemTransicao = ordemDIASemanaAlmoco;
+							}
+						}
+						else // FDS
+						{
+							if (horaAtual >= 16) {
+								ordemTransicao = ordemFDSSemanaJantar;
+							} else {
+								ordemTransicao = ordemFDSemanaAlmoco;
+							}
+						}
+                        trocarImagem();
+                    }, 60000); // 60000 milissegundos = 60 segundos
+                }).catch(function (error) {
+                    console.error("Erro ao entrar em tela cheia:", error);
+                });
+            }
+        }
+    </script>
+
+</body>
+
+</html>
